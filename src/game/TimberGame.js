@@ -38,6 +38,8 @@ export class TimberGame {
     this.lastChopTime = 0;
     this.runStartTime = 0;
     this.totalChopsInRun = 0;
+    this.isNewRecordInRun = false;
+    this.disposed = false;
 
     this.selectedCharId =
       localStorage.getItem(STORAGE_KEYS.CHARACTER) || CHARACTERS[0].id;
@@ -72,7 +74,8 @@ export class TimberGame {
     this.resetTree();
     this.handleResize();
 
-    window.addEventListener('resize', () => this.handleResize());
+    this.onResize = () => this.handleResize();
+    window.addEventListener('resize', this.onResize);
     this.rafId = requestAnimationFrame((ts) => this.loop(ts));
   }
 
@@ -387,6 +390,7 @@ export class TimberGame {
     this.lastChopTime = 0;
     this.runStartTime = 0;
     this.totalChopsInRun = 0;
+    this.isNewRecordInRun = false;
     this.state = GAME_STATE.READY;
 
     this.resetTree();
@@ -493,6 +497,7 @@ export class TimberGame {
 
     if (this.score > this.bestScore) {
       this.bestScore = this.score;
+      this.isNewRecordInRun = true;
       localStorage.setItem(STORAGE_KEYS.BEST_SCORE, String(this.bestScore));
     }
 
@@ -508,8 +513,7 @@ export class TimberGame {
 
   triggerGameOver(reason, byTimeout) {
     if (this.state === GAME_STATE.GAMEOVER) return;
-    const previousBest = Number(localStorage.getItem(STORAGE_KEYS.BEST_SCORE) || 0);
-    const isNewRecord = this.score > 0 && this.score >= previousBest && this.score === this.bestScore;
+    const isNewRecord = this.isNewRecordInRun;
 
     this.state = GAME_STATE.GAMEOVER;
     this.sound.playDeath(byTimeout);
@@ -694,6 +698,7 @@ export class TimberGame {
   }
 
   loop(ts) {
+    if (this.disposed) return;
     this.rafId = requestAnimationFrame((nextTs) => this.loop(nextTs));
 
     const dt = this.lastFrameTs ? Math.min((ts - this.lastFrameTs) / 1000, 0.05) : 0.016;
@@ -790,5 +795,67 @@ export class TimberGame {
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  destroy() {
+    if (this.disposed) return;
+    this.disposed = true;
+
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    window.removeEventListener('resize', this.onResize);
+
+    for (const seg of this.segments) {
+      this.treeGroup.remove(seg.group);
+      this.disposeSegment(seg);
+    }
+    this.segments = [];
+
+    for (const item of this.flyingLogs) {
+      this.scene.remove(item.seg.group);
+      this.disposeSegment(item.seg);
+    }
+    this.flyingLogs = [];
+
+    for (const p of this.particles) {
+      this.scene.remove(p.mesh);
+      p.mesh.material.dispose();
+    }
+    this.particles = [];
+
+    this.scene.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.geometry?.dispose?.();
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m) => m.dispose?.());
+        } else {
+          obj.material?.dispose?.();
+        }
+      }
+    });
+
+    this.trunkTextures?.forEach((t) => t.dispose());
+    this.stumpTexture?.dispose();
+    this.branchTexture?.dispose();
+    this.tombstoneTexture?.dispose();
+    this.cloudTexture?.dispose();
+    this.sunTexture?.dispose();
+    this.groundTexture?.dispose();
+    this.chipTexture?.dispose();
+    this.leafTexture?.dispose();
+
+    if (this.characterAssets) {
+      for (const assets of Object.values(this.characterAssets)) {
+        assets.idleTex?.dispose();
+        assets.chopTex?.dispose();
+      }
+    }
+
+    this.trunkGeo?.dispose();
+    this.branchGeo?.dispose();
+    this.particleGeo?.dispose();
+    this.renderer?.dispose();
   }
 }

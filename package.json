@@ -1,5 +1,5 @@
 {
-  "name": "timberman-threejs-2d",
+  "name": "timberman-vue-threejs",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
     "vite": "^6.0.0"
   }
 }
